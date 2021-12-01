@@ -1,51 +1,38 @@
-﻿let start = -2.0
-let finish = 1.9
-let approxPoints = 11
+﻿open System
 
 let inputPoints =
-    seq {
-        (-2.0, 4.0)
-        (-1.0, 1.0)
-        (0.0, 0.0)
-        (1.0, 1.0)
-        (2.0, 4.0)
-    }
-    |> Seq.map (fun x ->
-        printfn "Accessing %A" x
-        x)
+    Seq.initInfinite (fun _ -> Console.ReadLine())
+    |> Seq.takeWhile (fun s -> s <> null)
+    |> Seq.map (fun s -> s.Split [| ';' |])
+    |> Seq.map (Array.map Double.TryParse)
+    |> Seq.choose (function
+        | [| (true, x); (true, y) |] -> Some(x, y)
+        | _ ->
+            printfn "Point should be written in \"<number>; <number>\" format"
+            None)
+
+let linearApprox x1 y1 x2 y2 xs = y1 + (y2 - y1) * (xs - x1) / (x2 - x1)
 
 let linear =
     inputPoints
-    |> Seq.scan (fun (_, a) b -> (a, b)) ((0.0, 0.0), (-infinity, 0.0))
+    |> Seq.scan (fun (_, a) b -> (a, b)) ((0.0, 0.0), (0.0, 0.0))
     |> Seq.tail
-    |> Seq.map (fun ((x1, y1), (x2, y2)) -> x2, fun x -> (y2 - y1) * (x - x1) / (x2 - x1))
+    |> Seq.map (fun ((x1, y1), (x2, y2)) -> x2, linearApprox x1 y1 x2 y2)
+
+let start = -2.0
+let finish = 1.9
+let approxPoints = 11
 
 let sampleXs =
     seq { 0 .. approxPoints - 1 }
-    |> Seq.map (fun i ->
-        start
-        + (finish - start) * float i
-          / float (approxPoints - 1))
+    |> Seq.map (
+        float
+        >> linearApprox 0.0 start (float (approxPoints - 1)) finish
+    )
 
-linear
-|> Seq.map (fun (x, f) ->
-    sampleXs
-    |> Seq.choose (fun sx -> if sx < x then Some(f sx) else None))
-|> Seq.concat
-|> Seq.map (fun x ->
-    printfn "%A" x
-    true)
-|> Seq.contains false
-|> ignore
+let approximator = linear
 
-open System
-
-let lines =
-    Seq.initInfinite (fun _ -> Console.ReadLine())
-
-lines
-|> Seq.map (fun x ->
-    printfn "%A" x
-    x)
-|> Seq.contains null
+approximator
+|> Seq.map (printfn "%A")
+|> Seq.length
 |> ignore
