@@ -30,7 +30,7 @@ let linear =
     |> Seq.windowed 2
     |> Seq.map (function
         | [| (x1, y1); (x2, y2) |] -> x1, x2, linearApprox x1 y1 x2 y2
-        | _ -> 0.0, 0.0, id)
+        | _ -> failwith "Impossible")
 
 let model = linear
 
