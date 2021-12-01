@@ -19,16 +19,20 @@ let inputPoints =
         (1.0, 1.0)
         (2.0, 4.0)
     }
+    |> Seq.map (fun x ->
+        printfn "Acceccing %A of inputPoints" x
+        x)
 
 let linearApprox x1 y1 x2 y2 xs = y1 + (y2 - y1) * (xs - x1) / (x2 - x1)
 
 let linear =
     inputPoints
-    |> Seq.scan (fun (_, a) b -> (a, b)) ((0.0, 0.0), (0.0, 0.0))
-    |> Seq.tail
-    |> Seq.map (fun ((x1, y1), (x2, y2)) -> x2, linearApprox x1 y1 x2 y2)
+    |> Seq.windowed 2
+    |> Seq.map (function
+        | [| (x1, y1); (x2, y2) |] -> x1, x2, linearApprox x1 y1 x2 y2
+        | _ -> 0.0, 0.0, id)
 
-let approximator = linear
+let model = linear
 
 let start = -2.0
 let finish = 2.0
@@ -42,23 +46,23 @@ let sampleXs =
     )
 
 (*
-    Input points are a sequence,
-    since the process should work as a pipe.
-    They should also be only evaluated once,
-    and Seq.cache is not free.
-    Therefore iterating through them
-    using a loop is preferrable.
+    Input points are a sequence, since the process should work as a pipe.
+    They should also be only evaluated once, and Seq.cache is not free.
+    Therefore iterating through them using a loop is preferrable.
+
+    This is not exactly the same as a directed join,
+    as here we don't have key equivalence.
 *)
-let samplesSplit =
+let result =
     seq {
         let mutable samples = sampleXs
 
         (*
             Here we assign a function for interpolation
-            to the sample coordinated
-            based on the interval it falls into
+            to the sample coordinate based on the interval it falls into
         *)
-        for xUp, f in approximator do
+        for xDown, xUp, f in model do
+            samples <- List.skipWhile (fun x -> x < xDown) samples
             let left =
                 samples
                 |> List.takeWhile (fun x -> x < xUp)
@@ -68,8 +72,6 @@ let samplesSplit =
             samples <- List.skip left.Length samples
     }
 
-samplesSplit
+result
 |> Seq.map (fun (x, f) -> x, f x)
-|> Seq.map (fun (x, y) -> printfn "%f %f" x y)
-|> Seq.length
-|> ignore
+|> Seq.iter (fun (x, y) -> printfn "%f %f" x y)
