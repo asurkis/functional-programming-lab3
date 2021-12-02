@@ -1,38 +1,37 @@
 ﻿open System
 
-// let inputPoints =
-//     Seq.initInfinite (fun _ -> Console.ReadLine())
-//     |> Seq.takeWhile (fun s -> s <> null)
-//     |> Seq.map (fun s -> s.Split [| ';' |])
-//     |> Seq.map (Array.map Double.TryParse)
-//     |> Seq.choose (function
-//         | [| (true, x); (true, y) |] -> Some(x, y)
-//         | _ ->
-//             printfn "Point should be written in \"<number>; <number>\" format"
-//             None)
-
 let inputPoints =
-    seq {
-        (-2.0, 4.0)
-        (-1.0, 1.0)
-        (0.0, 0.0)
-        (1.0, 1.0)
-        (2.0, 4.0)
-    }
-    |> Seq.map (fun x ->
-        printfn "Acceccing %A of inputPoints" x
-        x)
+    Seq.initInfinite (fun _ -> Console.ReadLine())
+    |> Seq.takeWhile (fun s -> s <> null)
+    |> Seq.map (fun s -> s.Split [| ';' |])
+    |> Seq.map (Array.map Double.TryParse)
+    |> Seq.choose (function
+        | [| (true, x); (true, y) |] -> Some(x, y)
+        | _ ->
+            printfn "Point should be written in \"<number>; <number>\" format"
+            None)
 
-let linearApprox x1 y1 x2 y2 xs = y1 + (y2 - y1) * (xs - x1) / (x2 - x1)
+let polynomialApprox knownPoints samples =
+    let polynome i x =
+        knownPoints
+        |> Array.mapi (fun j (xj, _) -> if i = j then 1.0 else x - xj)
+        |> Array.reduce (*)
 
-let linear =
+    let polynomeCoefficients =
+        knownPoints
+        |> Array.mapi (fun i (xi, yi) -> yi / polynome i xi)
+
+    samples
+    |> List.map (fun x ->
+        seq { 0 .. knownPoints.Length - 1 }
+        |> Seq.sumBy (fun i -> polynomeCoefficients.[i] * polynome i x))
+
+let polynomial n =
     inputPoints
-    |> Seq.windowed 2
-    |> Seq.map (function
-        | [| (x1, y1); (x2, y2) |] -> x1, x2, linearApprox x1 y1 x2 y2
-        | _ -> failwith "Impossible")
+    |> Seq.windowed n
+    |> Seq.map (fun arr -> Array.head arr, Array.last arr, arr)
+    |> Seq.map (fun ((x1, _), (x2, _), arr) -> x1, x2, polynomialApprox arr)
 
-let model = linear
 
 let start = -2.0
 let finish = 2.0
@@ -40,10 +39,11 @@ let approxPoints = 21
 
 let sampleXs =
     [ 0 .. approxPoints - 1 ]
-    |> List.map (
-        float
-        >> linearApprox 0.0 start (float (approxPoints - 1)) finish
-    )
+    |> List.map float
+    |> polynomialApprox [| (0.0, start)
+                           ((float (approxPoints - 1)), finish) |]
+
+let model = polynomial 3
 
 (*
     Input points are a sequence, since the process should work as a pipe.
@@ -63,15 +63,15 @@ let result =
         *)
         for xDown, xUp, f in model do
             samples <- List.skipWhile (fun x -> x < xDown) samples
-            let left =
-                samples
-                |> List.takeWhile (fun x -> x < xUp)
-                |> List.map (fun x -> x, f)
 
-            yield! left
+            let left =
+                samples |> List.takeWhile (fun x -> x < xUp)
+
+            yield f, left
             samples <- List.skip left.Length samples
     }
 
 result
-|> Seq.map (fun (x, f) -> x, f x)
-|> Seq.iter (fun (x, y) -> printfn "%f %f" x y)
+|> Seq.map (fun (f, xs) -> List.zip xs (f xs))
+|> Seq.concat
+|> Seq.iter (fun (x, y) -> printfn "%f; %f" x y)
