@@ -7,6 +7,8 @@ open System
 let main argv =
     let config =
         ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", true)
+            .AddEnvironmentVariables()
             .AddCommandLine(argv)
             .Build()
 
